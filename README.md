@@ -24,6 +24,14 @@ channel mcp                                           # serve channel.post/read/
 A body of `-` reads stdin, for multi-line reports. `read --follow` tails a
 channel and will happily wait on one that doesn't exist yet.
 
+## Install
+
+```sh
+go install github.com/itsHabib/channel/cmd/channel@latest   # or @v0.1.0
+```
+
+Or clone and `make install` (builds `cmd/channel` → `$GOBIN/channel`).
+
 ## Quickstart
 
 ```sh
@@ -38,7 +46,7 @@ Agents get it as an MCP server — the tool descriptions tell them when to reach
 for it, no per-repo stamping required:
 
 ```sh
-claude mcp add channel -- channel mcp
+claude mcp add --scope user channel -- channel mcp   # machine-wide, all sessions
 ```
 
 ## Design
@@ -85,4 +93,9 @@ make check   # vet + golangci-lint + race tests + build
 ```
 
 Go 1.26, no runtime dependencies beyond the MCP SDK. CI runs tests (race),
-golangci-lint, and govulncheck.
+golangci-lint, and govulncheck. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
+design invariants a change must respect.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
