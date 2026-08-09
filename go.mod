@@ -5,6 +5,7 @@ go 1.26.5
 require (
 	github.com/modelcontextprotocol/go-sdk v1.6.0
 	github.com/stretchr/testify v1.11.1
+	pgregory.net/rapid v1.3.0
 )
 
 require (
