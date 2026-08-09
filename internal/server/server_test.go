@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/itsHabib/channel/internal/server"
@@ -90,6 +91,54 @@ func TestListOverMCP(t *testing.T) {
 	res := call(t, cs, "channel.list", map[string]any{}, &listed)
 	require.False(t, res.IsError)
 	require.Len(t, listed.Channels, 2)
+}
+
+// failStore implements server.Store and fails every call with a non-sentinel
+// error, to exercise the internal-error mapping in mcpError plus each
+// handler's error return.
+type failStore struct{}
+
+func (failStore) Post(_, _, _ string) (store.Message, error) {
+	return store.Message{}, errors.New("boom")
+}
+
+func (failStore) Read(_, _ string, _ int) ([]store.Message, string, error) {
+	return nil, "", errors.New("boom")
+}
+
+func (failStore) List() ([]store.Info, error) { return nil, errors.New("boom") }
+
+func TestInternalErrorsSurfaceAsToolErrors(t *testing.T) {
+	ctx := context.Background()
+	srv := mcp.NewServer(&mcp.Implementation{Name: t.Name(), Version: "v0-test"}, nil)
+	server.Register(srv, failStore{})
+
+	ct, srvT := mcp.NewInMemoryTransports()
+	_, err := srv.Connect(ctx, srvT, nil)
+	require.NoError(t, err)
+
+	cl := mcp.NewClient(&mcp.Implementation{Name: t.Name() + "-cli", Version: "v0-test"}, nil)
+	cs, err := cl.Connect(ctx, ct, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = cs.Close() })
+
+	for _, tc := range []struct {
+		tool string
+		args map[string]any
+	}{
+		{"channel.post", map[string]any{"channel": "dev", "from": "a", "body": "x"}},
+		{"channel.read", map[string]any{"channel": "dev"}},
+		{"channel.list", map[string]any{}},
+	} {
+		res, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: tc.tool, Arguments: tc.args})
+		// A returned jsonrpc.Error surfaces either as a protocol-level error
+		// or as a tool result with IsError — both are acceptable failures.
+		if err != nil {
+			continue
+		}
+
+		require.True(t, res.IsError, "%s should surface an internal error", tc.tool)
+	}
 }
 
 func TestInvalidArgsSurfaceAsToolErrors(t *testing.T) {

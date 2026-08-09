@@ -160,6 +160,23 @@ func appendRaw(t *testing.T, path, chunk string) {
 	require.NoError(t, f.Close())
 }
 
+func TestDirReportsResolvedPath(t *testing.T) {
+	dir := t.TempDir()
+
+	st, err := store.New(dir)
+	require.NoError(t, err)
+	require.Equal(t, dir, st.Dir())
+}
+
+func TestNewFailsWhenDirPathIsAFile(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "not-a-dir")
+	require.NoError(t, os.WriteFile(f, []byte("x"), 0o644))
+
+	// MkdirAll under a regular file must fail.
+	_, err := store.New(filepath.Join(f, "sub"))
+	require.Error(t, err)
+}
+
 func TestList(t *testing.T) {
 	st := newStore(t)
 
@@ -176,6 +193,42 @@ func TestList(t *testing.T) {
 	require.ElementsMatch(t, []string{"alpha", "beta"}, names)
 	require.Positive(t, infos[0].SizeBytes)
 	require.False(t, infos[0].LastActivity.Before(infos[1].LastActivity))
+}
+
+func TestListSkipsNonChannelEntries(t *testing.T) {
+	dir := t.TempDir()
+
+	st, err := store.New(dir)
+	require.NoError(t, err)
+
+	_, err = st.Post("real", "a", "x")
+	require.NoError(t, err)
+
+	// A non-.jsonl file and a directory that happens to end in .jsonl must
+	// both be ignored.
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "README.md"), []byte("hi"), 0o644))
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "weird.jsonl"), 0o755))
+
+	infos, err := st.List()
+	require.NoError(t, err)
+	require.Len(t, infos, 1)
+	require.Equal(t, "real", infos[0].Name)
+}
+
+func TestReadRejectsCorruptLine(t *testing.T) {
+	dir := t.TempDir()
+
+	st, err := store.New(dir)
+	require.NoError(t, err)
+
+	_, err = st.Post("dev", "a", "ok")
+	require.NoError(t, err)
+
+	appendRaw(t, filepath.Join(dir, "dev.jsonl"), "this is not json\n")
+
+	_, _, err = st.Read("dev", "", 0)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "corrupt line")
 }
 
 // TestConcurrentAppends is the core atomicity claim: many writers, one file,

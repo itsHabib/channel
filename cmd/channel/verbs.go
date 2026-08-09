@@ -26,7 +26,7 @@ func cmdPost(args []string, stdout io.Writer) error {
 		return errUsage
 	}
 
-	body, err := postBody(fs.Args()[1:])
+	body, err := postBody(fs.Args()[1:], os.Stdin)
 	if err != nil {
 		return err
 	}
@@ -46,11 +46,11 @@ func cmdPost(args []string, stdout io.Writer) error {
 	return nil
 }
 
-// postBody joins the positional body words; a lone "-" reads stdin instead,
-// for multi-line payloads like reports.
-func postBody(words []string) (string, error) {
+// postBody joins the positional body words; a lone "-" reads from stdin
+// instead, for multi-line payloads like reports.
+func postBody(words []string, stdin io.Reader) (string, error) {
 	if len(words) == 1 && words[0] == "-" {
-		data, err := io.ReadAll(os.Stdin)
+		data, err := io.ReadAll(stdin)
 		if err != nil {
 			return "", fmt.Errorf("read body from stdin: %w", err)
 		}
@@ -96,23 +96,36 @@ func cmdRead(args []string, stdout io.Writer) error {
 	return nil
 }
 
-// followChannel tails a channel forever, polling from the last cursor. A
-// channel that does not exist yet is waited on, not an error — the peer may
-// simply not have posted first.
+// followChannel tails a channel forever, polling from the last cursor.
 func followChannel(st *store.Store, name, cursor string, stdout io.Writer) error {
 	for {
-		msgs, next, err := st.Read(name, cursor, 0)
-		if err != nil && !errors.Is(err, store.ErrChannelNotFound) {
+		next, err := followOnce(st, name, cursor, stdout)
+		if err != nil {
 			return err
 		}
 
-		if err == nil {
-			printMessages(stdout, msgs)
-			cursor = next
-		}
+		cursor = next
 
 		time.Sleep(followInterval)
 	}
+}
+
+// followOnce prints any messages after cursor and returns the next cursor. A
+// channel that does not exist yet is waited on, not an error — the peer may
+// simply not have posted first — so the cursor is returned unchanged.
+func followOnce(st *store.Store, name, cursor string, stdout io.Writer) (string, error) {
+	msgs, next, err := st.Read(name, cursor, 0)
+	if err != nil {
+		if errors.Is(err, store.ErrChannelNotFound) {
+			return cursor, nil
+		}
+
+		return cursor, err
+	}
+
+	printMessages(stdout, msgs)
+
+	return next, nil
 }
 
 func printMessages(w io.Writer, msgs []store.Message) {
