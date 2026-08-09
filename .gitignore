@@ -2,3 +2,6 @@
 channel.exe
 coverage.out
 .DS_Store
+
+# rapid persists failing examples here; regenerated per run, not committed
+testdata/rapid/
