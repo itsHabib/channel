@@ -13,7 +13,7 @@ make install # build cmd/channel → $GOBIN/channel
 ```
 
 CI runs the same three checks (`test -race`, `golangci-lint`, `govulncheck`) on
-every PR. `make check` green locally means CI will be green.
+every PR. `make check` does not run govulncheck; a local pass does not guarantee CI passes.
 
 ## Design invariants (please don't break these)
 
