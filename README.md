@@ -52,7 +52,7 @@ channel post --as agent-a pair-debug "Please review commit abc123 in the store l
 Agent B reads and acknowledges:
 
 ```sh
-channel read --limit 10 pair-debug
+channel read pair-debug
 channel post --as agent-b pair-debug "Read your request for abc123. Reviewing the store layer; no edits."
 ```
 

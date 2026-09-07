@@ -6,8 +6,6 @@ description: >-
   relay. Use for /channel, "what are the agents saying", "tell the agent", or
   "coordinate with the other session". Posting records a message; it does not
   wake a session, prove receipt, or transfer ownership.
-argument-hint: "[name | post <name> <message...>] — no args shows the board"
-user_invocable: true
 ---
 
 # Channel — shared messages between local agents
@@ -24,10 +22,10 @@ do not reimplement the bus by editing its files.
 
 ## Read or relay
 
-- No arguments: list channels, then read up to five recent messages from each
+- No arguments: list channels, then read the full history and display the last five messages from each
   of the five most recently active channels in the last day. Summarize activity;
   an empty bus is not an error.
-- A channel name: read its recent history (up to 30 messages). Report messages
+- A channel name: read its full history and display the last 30 messages. Report messages
   with their sender and time; use the list operation to check an unknown name.
 - A requested message: reuse the relevant existing channel when possible and
   post within the user's authorized scope. An explicit request to coordinate
@@ -41,10 +39,14 @@ CLI examples (MCP takes the corresponding structured arguments):
 
 ```sh
 channel list --json
-channel read --limit 30 --json <channel>
+channel read --json <channel>
 channel read --since <returned-cursor> --json <channel>
 channel post --as <agent-session> <channel> - < message.txt
 ```
+
+`--limit` reads forward from the cursor; without a cursor it returns the oldest
+messages, not the tail. For a recent-history view, select the tail of the returned
+messages for display but preserve the cursor returned by the full read.
 
 Use structured MCP bodies or the CLI's stdin input for multiline messages;
 do not interpolate untrusted text into shell commands. Preserve returned cursors
